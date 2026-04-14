@@ -159,14 +159,14 @@ setup_test() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# TEST CASE DEFINITIONS (ID, File, Name, Description)
+# TEST CASE DEFINITIONS (ID, File, Name, Description - Stakeholder friendly)
 # ─────────────────────────────────────────────────────────────────────────────
 declare -a TEST_CASES=(
-  "TC05|05_weather_widget_location|Weather Widget Location|Verifies weather widget functionality: tap weather button, grant location permission, verify weather forecast loads, and return to home screen with feed cards visible"
-  "TC06|06_type_question_ai_response|Type Question AI Response|Tests the chat flow: tap type button, enter a farming question, send message, wait for AI response, verify related questions appear, and tap on a follow-up question"
-  "TC08|08_home_feed_scroll|Home Feed Scroll|Validates home feed scrolling: complete onboarding, verify home screen loads, scroll through feed cards, and verify 'Learn More' content is accessible"
-  "TC11|11_listen_ai_response|Listen AI Response|Tests text-to-speech functionality: ask a question, receive AI response, tap listen button to play audio response, and verify audio playback controls"
-  "TC25|25_settings_logout|Settings Logout|Complete authentication flow test: sign up with phone number, verify OTP, login successfully, navigate to settings, tap logout, and verify return to language selection screen"
+  "TC05|05_weather_widget_location|Weather Feature|User can view local weather forecast by sharing their location"
+  "TC06|06_type_question_ai_response|Ask Questions (Type)|User can type a farming question and receive helpful AI-powered answers with follow-up suggestions"
+  "TC08|08_home_feed_scroll|Home Screen Content|User can browse and scroll through farming tips and recommendations on the home screen"
+  "TC11|11_listen_ai_response|Listen to Answers|User can listen to AI responses using text-to-speech audio playback"
+  "TC25|25_settings_logout|Login and Logout|User can sign up with phone number, receive OTP, login successfully, and logout from settings"
 )
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -237,20 +237,33 @@ for test_case in "${TEST_CASES[@]}"; do
     ERROR_MESSAGE=$(echo "$OUTPUT" | grep -A 2 "FAILED" | head -3 | tr '\n' ' ' | tr '"' "'" | sed 's/[[:cntrl:]]//g')
   fi
   
-  # Build JSON for this test result
+  # Build JSON for this test result (stakeholder-friendly)
   if [ -n "$TEST_RESULTS" ]; then
     TEST_RESULTS="$TEST_RESULTS,"
   fi
   
+  # Convert duration to readable format
+  if [ $TEST_DURATION -ge 60 ]; then
+    DURATION_FRIENDLY="$((TEST_DURATION / 60))m $((TEST_DURATION % 60))s"
+  else
+    DURATION_FRIENDLY="${TEST_DURATION}s"
+  fi
+  
+  # Status emoji for quick visual
+  if [ "$STATUS" = "PASSED" ]; then
+    STATUS_DISPLAY="✓ Passed"
+  else
+    STATUS_DISPLAY="✗ Failed"
+  fi
+  
   TEST_RESULTS="$TEST_RESULTS
     {
-      \"test_id\": \"$TC_ID\",
-      \"test_file\": \"$TC_FILE\",
-      \"test_name\": \"$TC_NAME\",
-      \"description\": \"$TC_DESC\",
-      \"status\": \"$STATUS\",
-      \"duration_seconds\": $TEST_DURATION,
-      \"error_message\": \"$ERROR_MESSAGE\"
+      \"id\": \"$TC_ID\",
+      \"name\": \"$TC_NAME\",
+      \"what_it_tests\": \"$TC_DESC\",
+      \"result\": \"$STATUS_DISPLAY\",
+      \"time_taken\": \"$DURATION_FRIENDLY\",
+      \"issue\": \"$ERROR_MESSAGE\"
     }"
 done
 
@@ -260,53 +273,51 @@ MINS=$((TOTAL_DURATION / 60))
 SECS=$((TOTAL_DURATION % 60))
 
 # ─────────────────────────────────────────────────────────────────────────────
-# GENERATE JSON REPORT
+# GENERATE JSON REPORT (Stakeholder-friendly format)
 # ─────────────────────────────────────────────────────────────────────────────
 REPORT_FILE="$REPORTS_DIR/test_report_${TESTER_NAME// /_}_${TIMESTAMP}.json"
 RUN_DATE=$(date +%Y-%m-%d)
 RUN_TIME=$(date +%H:%M:%S)
+RUN_DATE_FRIENDLY=$(date +"%B %d, %Y")
+RUN_TIME_FRIENDLY=$(date +"%I:%M %p")
+
+# Determine overall status
+if [ $FAILED -eq 0 ]; then
+  OVERALL_STATUS="All Tests Passed ✓"
+  HEALTH_STATUS="Healthy"
+else
+  OVERALL_STATUS="$FAILED Test(s) Failed"
+  HEALTH_STATUS="Needs Attention"
+fi
 
 cat > "$REPORT_FILE" << EOF
 {
-  "report_metadata": {
-    "report_id": "${TESTER_NAME// /_}_${TIMESTAMP}",
-    "generated_at": "${RUN_DATE}T${RUN_TIME}",
-    "report_version": "1.0"
-  },
-  "tester_info": {
-    "tester_name": "$TESTER_NAME",
-    "machine_hostname": "$(hostname)",
-    "os_type": "$(uname -s)",
-    "os_version": "$(uname -r)"
-  },
-  "device_info": {
-    "device_id": "$DEVICE_ID",
-    "device_serial": "$DEVICE_SERIAL",
-    "brand": "$DEVICE_BRAND",
-    "manufacturer": "$DEVICE_MANUFACTURER",
-    "model": "$DEVICE_MODEL",
-    "device_name": "$DEVICE_NAME",
-    "android_version": "$ANDROID_VERSION",
-    "sdk_version": "$SDK_VERSION",
-    "build_id": "$BUILD_ID",
-    "security_patch": "$SECURITY_PATCH"
-  },
-  "test_summary": {
+  "report_title": "FarmerChat App - Test Execution Report",
+  "executive_summary": {
+    "status": "$OVERALL_STATUS",
+    "health": "$HEALTH_STATUS",
+    "pass_rate": "$(echo "scale=0; $PASSED * 100 / $TOTAL" | bc)%",
+    "tests_passed": $PASSED,
+    "tests_failed": $FAILED,
     "total_tests": $TOTAL,
-    "passed": $PASSED,
-    "failed": $FAILED,
-    "pass_rate": "$(echo "scale=2; $PASSED * 100 / $TOTAL" | bc)%",
-    "total_duration_seconds": $TOTAL_DURATION,
-    "total_duration_formatted": "${MINS}m ${SECS}s",
-    "run_date": "$RUN_DATE",
-    "run_time": "$RUN_TIME"
+    "execution_time": "${MINS} minutes ${SECS} seconds"
   },
-  "test_results": [$TEST_RESULTS
+  "test_details": {
+    "date": "$RUN_DATE_FRIENDLY",
+    "time": "$RUN_TIME_FRIENDLY",
+    "tested_by": "$TESTER_NAME",
+    "device_used": "$DEVICE_BRAND $DEVICE_MODEL",
+    "android_version": "Android $ANDROID_VERSION"
+  },
+  "test_cases": [$TEST_RESULTS
   ],
-  "app_under_test": {
-    "package_name": "$APP_ID",
-    "app_name": "FarmerChat"
-  }
+  "device_information": {
+    "brand": "$DEVICE_BRAND",
+    "model": "$DEVICE_MODEL",
+    "android_version": "$ANDROID_VERSION",
+    "device_id": "$DEVICE_ID"
+  },
+  "report_generated": "$RUN_DATE_FRIENDLY at $RUN_TIME_FRIENDLY"
 }
 EOF
 
